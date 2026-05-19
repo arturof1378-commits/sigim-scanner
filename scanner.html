@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Escáner QR SIGIM</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    *{
+      box-sizing:border-box;
+    }
+
+    body{
+      margin:0;
+      padding:0;
+      font-family:Arial,sans-serif;
+      background:#e9eef3;
+      color:#1f3c5b;
+      text-align:center;
+    }
+
+    header{
+      background:#1f3c5b;
+      color:white;
+      padding:28px 15px;
+      box-shadow:0 4px 18px rgba(0,0,0,0.25);
+    }
+
+    header h1{
+      margin:0;
+      font-size:30px;
+    }
+
+    header p{
+      margin:10px 0 0 0;
+      font-size:16px;
+      color:#dce8ef;
+    }
+
+    .contenedor{
+      width:100%;
+      max-width:620px;
+      margin:25px auto;
+      padding:0 15px;
+    }
+
+    #reader{
+      width:100%;
+      background:white;
+      border-radius:20px;
+      overflow:hidden;
+      box-shadow:0 8px 24px rgba(0,0,0,0.20);
+    }
+
+    .estado{
+      width:100%;
+      margin:20px auto;
+      padding:16px;
+      border-radius:14px;
+      background:#1f3c5b;
+      color:white;
+      font-size:16px;
+      line-height:1.5;
+      font-weight:bold;
+    }
+
+    .estado.ok{
+      background:#1f3c5b;
+    }
+
+    .estado.error{
+      background:#e74c3c;
+    }
+
+    .estado.procesando{
+      background:#46bdc6;
+    }
+
+    .btn{
+      width:100%;
+      border:none;
+      padding:16px 24px;
+      background:#46bdc6;
+      color:white;
+      border-radius:14px;
+      font-size:17px;
+      font-weight:bold;
+      cursor:pointer;
+      margin-top:12px;
+    }
+
+    .btnSecundario{
+      background:#1f3c5b;
+    }
+
+    .nota{
+      margin-top:18px;
+      font-size:14px;
+      color:#43515d;
+      line-height:1.5;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>📷 Escáner QR SIGIM</h1>
+    <p id="subtitulo">Apunta la cámara al código QR</p>
+  </header>
+
+  <div class="contenedor">
+
+    <div id="reader"></div>
+
+    <div class="estado" id="estado">
+      Iniciando cámara...
+    </div>
+
+    <button class="btn" onclick="iniciarScanner()">
+      🔄 Reintentar escaneo
+    </button>
+
+    <button class="btn btnSecundario" onclick="regresarSinEscanear()">
+      ⬅ Regresar a SIGIM
+    </button>
+
+    <div class="nota">
+      Si el navegador solicita permisos, selecciona <strong>Permitir cámara</strong>.
+    </div>
+
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+
+    const modo = params.get('modo') || 'entrada';
+    const returnUrl = params.get('returnUrl') || '';
+
+    let scanner = null;
+    let yaDetectado = false;
+
+    document.getElementById('subtitulo').innerHTML =
+      modo === 'salida'
+        ? 'Escaneo para registrar salida'
+        : 'Escaneo para registrar entrada';
+
+    function extraerID(texto){
+
+      if(!texto) return '';
+
+      const contenido = texto.trim();
+      const lineas = contenido.split('\n');
+
+      for(let i = 0; i < lineas.length; i++){
+
+        const linea = lineas[i].trim();
+
+        if(linea.toUpperCase().startsWith('ID:')){
+          return linea.replace(/ID:/i, '').trim();
+        }
+
+      }
+
+      if(
+        contenido.startsWith('REF-') ||
+        contenido.startsWith('HER-')
+      ){
+        return contenido;
+      }
+
+      return '';
+
+    }
+
+    function regresarAWebApp(id){
+
+      if(!returnUrl){
+
+        document.getElementById('estado').className = 'estado error';
+        document.getElementById('estado').innerHTML =
+          '❌ No se recibió la URL de regreso a SIGIM.';
+
+        return;
+
+      }
+
+      const separador = returnUrl.includes('?') ? '&' : '?';
+
+      window.location.href =
+        returnUrl +
+        separador +
+        'modo=' + encodeURIComponent(modo) +
+        '&id=' + encodeURIComponent(id);
+
+    }
+
+    function regresarSinEscanear(){
+
+      if(returnUrl){
+        window.location.href = returnUrl;
+      } else {
+        window.history.back();
+      }
+
+    }
+
+    function iniciarScanner(){
+
+      yaDetectado = false;
+
+      document.getElementById('estado').className = 'estado';
+      document.getElementById('estado').innerHTML =
+        '📷 Solicitando acceso a cámara...';
+
+      if(scanner){
+        scanner.clear().catch(function(){});
+      }
+
+      scanner = new Html5QrcodeScanner(
+        'reader',
+        {
+          fps: 12,
+          qrbox: {
+            width: 260,
+            height: 260
+          },
+          rememberLastUsedCamera: true,
+          supportedScanTypes: [
+            Html5QrcodeScanType.SCAN_TYPE_CAMERA
+          ]
+        },
+        false
+      );
+
+      scanner.render(
+        function(decodedText){
+
+          if(yaDetectado) return;
+
+          yaDetectado = true;
+
+          const id = extraerID(decodedText);
+
+          if(!id){
+
+            document.getElementById('estado').className = 'estado error';
+            document.getElementById('estado').innerHTML =
+              '❌ QR leído, pero no contiene un ID válido.';
+
+            yaDetectado = false;
+            return;
+
+          }
+
+          document.getElementById('estado').className = 'estado procesando';
+          document.getElementById('estado').innerHTML =
+            '✅ QR detectado: ' + id + '<br>Regresando a SIGIM...';
+
+          scanner.clear().then(function(){
+            regresarAWebApp(id);
+          }).catch(function(){
+            regresarAWebApp(id);
+          });
+
+        },
+        function(errorMessage){
+          /*
+            Los errores por frame se ignoran.
+            Esto es normal mientras la cámara busca el QR.
+          */
+        }
+      );
+
+    }
+
+    iniciarScanner();
+  </script>
+
+</body>
+</html>
