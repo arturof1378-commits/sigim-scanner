@@ -175,27 +175,30 @@
 
     }
 
-    function regresarAWebApp(id){
+   function regresarAWebApp(id){
 
-      if(!returnUrl){
+  if(!returnUrl){
 
-        document.getElementById('estado').className = 'estado error';
-        document.getElementById('estado').innerHTML =
-          '❌ No se recibió la URL de regreso a SIGIM.';
+    document.getElementById('estado').className = 'estado error';
+    document.getElementById('estado').innerHTML =
+      '❌ No se recibió la URL de regreso a SIGIM.';
 
-        return;
+    return;
 
-      }
+  }
 
-      const separador = returnUrl.includes('?') ? '&' : '?';
+  const separador = returnUrl.includes('?') ? '&' : '?';
 
-      window.location.href =
-        returnUrl +
-        separador +
-        'modo=' + encodeURIComponent(modo) +
-        '&id=' + encodeURIComponent(id);
+  const urlRegreso =
+    returnUrl +
+    separador +
+    'modo=' + encodeURIComponent(modo) +
+    '&id=' + encodeURIComponent(id) +
+    '&t=' + Date.now();
 
-    }
+  window.location.replace(urlRegreso);
+
+}
 
     function regresarSinEscanear(){
 
